@@ -1,14 +1,6 @@
 # gve_devnet_webex_xsi_call_disconnect
+
 This application serves as a monitoring tool for Webex calls, ensuring they do not overextend their allotted duration by proactively disconnecting them. It additionally logs both answered and released calls, presenting the data on a Flask-based dashboard. The application also generates adaptive cards corresponding to call events to send in a Webex room, offering a visually intuitive representation of the call data.
-
-
-## Contacts
-* Mark Orszycki
-
-## Solution Components
-* Webex
-*  XSI
-
 
 ## Prerequisites
 
@@ -67,13 +59,13 @@ Ensure that the TIMESPAN_IN_SECONDS parameter is adjusted based on your applicat
 
 ## Usage
 To run the program, use the command:
-```
-$ python3 app.py
+```shell
+docker-compose up --build
 ```
 
 
 ### Additional Info
-* Webex Interaction: This application specifically tracks 'answered' and 'released' call events, and displays them using an adaptive card format for better clarity and user interaction. For more info: https://developer.webex.com/buttons-and-cards-designer
+* Webex Interaction: This application specifically tracks 'answered' and 'released' call events, and displays them using an adaptive card format for better clarity and user interaction. Doe more info: https://developer.webex.com/buttons-and-cards-designer
 * Rich is used for terminal logging to enhance the output.
 * A flask dashboard showing Call statistics is displayed at PUBLIC_URL/success
 

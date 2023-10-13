@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  webex-call-monitor:
+    container_name: WebexCallMonitor
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9001:9001"
+    environment:
+      - NAME=WebexCallMonitor
+    volumes:
+      - .:/app  # mounting the entire project directory
+    networks:
+      - webex-call-monitor-network
+    stdin_open: true  # Keep stdin open equivalent to -i
+    tty: true  # Allocate a pseudo-TTY equivalent to -t
+
+networks:
+  webex-call-monitor-network:
+    driver: bridge

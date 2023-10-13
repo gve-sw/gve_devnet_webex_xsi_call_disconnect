@@ -1,10 +1,11 @@
 import os
 import logging
 import rich.logging
+from rich.console import Console
 from rich.table import Table
 from rich import print as rprint
-from rich.console import Console
 from rich.text import Text
+from rich.panel import Panel
 import requests
 import wxcadm
 import time
@@ -15,9 +16,6 @@ import base64
 
 # Load environment variables from .env file
 load_dotenv()
-
-GLOBAL_LOG_CONTROL = True  # Used to control the logging level globally
-GLOBAL_LOG_LEVEL = logging.INFO  # default value
 
 
 class EnvironmentManager:
@@ -60,19 +58,24 @@ class EnvironmentManager:
         missing_vars = []
         console = Console()  # Instantiate a console object for rich
 
-        table = Table(title="Environment Variables")
+        table = Table()
         table.add_column("Variable", justify="left", style="bright_white", width=30)
         table.add_column("Value", style="bright_white", width=50)
 
         for var_name, var_value in cls.__dict__.items():
             if "os" in var_name or "__" in var_name or isinstance(var_value, classmethod):  # ignore class documentation & methods
                 continue
+            # FOR SANI
+            # if var_name == 'CLIENT_ID' and var_value is not None:
+            #     table.add_row(var_name, "OK")
+            # else:
+            #     table.add_row(var_name, str(var_value) if var_value is not None else "Not Set")
             table.add_row(var_name, str(var_value) if var_value is not None else "Not Set")
             if var_value in ("", None) and var_name != "TIMESPAN_IN_SECONDS":  # Exclude TIMESPAN_IN_SECONDS from this check
                 missing_vars.append(var_name)
 
         # Display the table
-        console.print(table)
+        console.print(Panel.fit(table, title="Step 1: Retrieve and Validate Environment Variables"))
 
         if missing_vars:
             raise EnvironmentError(f"The following environment variables are not set: {', '.join(missing_vars)}")
@@ -104,21 +107,37 @@ class LoggerManager:
         log_flattened_event_data(event) - Logs the provided event data in a structured two-column table format after flattening.
     """
 
-    def __init__(self):
-        self.logger = self.setup()
-        self.original_log_level = self.logger.level
-        self.console = Console()
+    def __init__(self, log_filename):
+        """
+        Initializes the logger with console and file handlers and sets up the log format.
 
-    def setup(self):
+        Parameters:
+            log_filename (str): The name of the file where the logger should store logs.
+        """
+        self.console = Console()
+        self.logger = self.setup(log_filename)
+        self.original_log_level = self.logger.level
+
+    def setup(self, log_filename):
+        """
+        Configures and returns the logger with appropriate handlers and log format.
+
+        Parameters:
+            log_filename (str): The name of the file where the logger should store logs.
+
+        Returns:
+            logging.Logger: Configured logger instance.
+        """
         log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         console_handler = rich.logging.RichHandler()
         console_handler.setFormatter(logging.Formatter(log_format))
 
-        file_handler = logging.FileHandler("app.log", mode='a')
+        file_handler = logging.FileHandler(log_filename, mode='a')
         file_handler.setFormatter(logging.Formatter(log_format))
 
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.INFO)  # default log level
+        # Using log_filename as the logger name ensures separate loggers for different files.
+        logger = logging.getLogger(log_filename)
+        logger.setLevel(logging.ERROR)
         logger.addHandler(console_handler)
         logger.addHandler(file_handler)
 
@@ -170,7 +189,7 @@ class LoggerManager:
         # Suppress any other logging for now
         self.suppress_logging()
 
-        table = Table(show_header=True, header_style="bold magenta")
+        table = Table(show_header=True, header_style="bold magenta", title="Call Released Details")
         table.add_column("Key", width=100)
         table.add_column("Value", width=50)
 
@@ -192,7 +211,8 @@ class LoggerManager:
         self.restore_logging()
 
 
-logger_manager = LoggerManager()  # Instantiate custom logger
+logger_manager = LoggerManager("app.log")  # Instantiate custom logger
+call_history_logger_manager = LoggerManager("call_history.log")
 
 # Global counters to maintain the number of answered and released calls
 answered_calls_count = 0
@@ -404,6 +424,7 @@ class CallMonitor:
         self.answered_calls = set()  # Track call IDs of answered calls
         self.call_to_user_map = {}  # Track / map call to user
         self.ended_call_ids = set()  # Track Call Ids of released calls
+        self.call_history = []  # This will store our call history
 
         # Initialize the xsi_user_map with users and their respective details.
         for person in self.all_people:
@@ -413,7 +434,9 @@ class CallMonitor:
                 "display_name": person.display_name.lower(),
                 "id": person_id,
             }
-        logger_manager.logger.info(f"xsi_user_map initialized with {len(self.xsi_user_map)} users.")
+        # logger_manager.logger.info(f"xsi_user_map initialized with {len(self.xsi_user_map)} users.")
+        print("\n")
+        logger_manager.console.print(f"\nCall Monitoring Initiated for {len(self.xsi_user_map)} users.")
 
     def setup_xsi_events(self):
         """ Initialize XSI events and set up a thread to monitor calls continuously. """
@@ -432,11 +455,10 @@ class CallMonitor:
             logger_manager.logger.debug("Starting monitor thread.")
             monitor_thread = threading.Thread(target=self.monitor_calls, args=(events_queue,), daemon=True)  # Use self.monitor_calls
             monitor_thread.start()
-
-            logger_manager.logger.info("Webex setup complete. Ready for calls.")
-            message = Text("Call Monitoring has been started for the organization...", style="bold red")
-            console.print("\n\n", Text("Call Monitoring has been started for the organization...", style="bold red"), "\n\n")
-
+            logger_manager.console.print("\n")
+            logger_manager.console.print(Panel.fit("[bright_red]Call Monitoring has been started for the organization...[/bright_red]", title="[bold deep_sky_blue3]Webex "
+                                                                                                                                              "setup complete. Ready for "
+                                                                                                                                              "calls.[/bold deep_sky_blue3]"))
 
         except Exception as e:
             logger_manager.logger.exception("Failed to setup webex call monitoring: ", exc_info=e)
@@ -473,6 +495,23 @@ class CallMonitor:
             logger_manager.logger.error(f"Error extracting event details: {e}")
             return {}
 
+    def print_event_details(self, events_data):
+        console = Console()
+        table = Table(show_header=True, header_style="bold magenta")
+
+        # Check if events_data is non-empty and the first item is a dictionary
+        if events_data and isinstance(events_data[0], dict):
+            # Dynamically add columns based on the keys in the first event data
+            for key in events_data[0].keys():
+                table.add_column(key.capitalize())  # Capitalize to make headers more readable
+
+            # Add a row for each event in the history
+            for event_data in events_data:
+                table.add_row(*[str(value) for value in event_data.values()])
+            console.print(table)
+        else:
+            logger_manager.logger.error(f"Unexpected format in events_data: {events_data}")
+
     def process_event(self, event, event_details):
         """
         Process the extracted event details.
@@ -489,25 +528,16 @@ class CallMonitor:
             self.ended_call_ids.add(event_details["call_id"])
             released_calls_count += 1
             self.handle_call_released_event(event)  # call the event handler for CallReleasedEvent
-            logger_manager.logger.info(f"The call has been ended for Call ID: {event_details['call_id']}")
-            call_id = event_details["call_id"]
-            message = Text(f"The call has been ended for Call ID: {call_id}", style="bold red")
-            console.print("\n\n")
-            console.print(message)
-            console.print("\n\n")
 
         # Handling CallAnsweredEvent
         if event_details["event_type"] == 'xsi:CallAnsweredEvent' and event_details["state"] == 'Active' and event_details["personality"] == 'Originator':
-            logger_manager.logger.info(f"Extracted remote_party_name: {event_details['remote_party_name']}")
             answered_calls_count += 1
-            self.handle_answered_call(event)
+            self.handle_call_answered_event(event)
             matched_user_entry = next((entry for entry in self.xsi_user_map.values() if entry.get('display_name') == event_details["remote_party_name"]), None)
 
             if matched_user_entry:
                 matched_user_entry['channelId'] = event_details["channelId"]
                 matched_user_id = matched_user_entry.get('id')
-                logger_manager.logger.info(f"Assigned channelId: {event_details['channelId']} to user_id: {matched_user_id}")
-                logger_manager.logger.info(f"Registering call with call_id: {event_details['call_id']} and user_id: {matched_user_id}")
                 self.register_call(event_details["call_id"], matched_user_id)
                 self.schedule_call_end(event_details["call_id"])
             else:
@@ -521,7 +551,6 @@ class CallMonitor:
         """
         global answered_calls_count
         global released_calls_count
-        logger_manager.logger.info("STARTING TO MONITOR ALL CALLS FOR YOUR WEBEX ORGANIZATION...")
         self.send_info_to_webex_room("The calls are now being monitored for the organization...")
 
         while True:  # Start an infinite loop to get the messages as they are placed in Queue
@@ -536,7 +565,28 @@ class CallMonitor:
             except Exception as e:
                 logger_manager.logger.error(f"Error in the monitoring loop: {e}")
 
-    def handle_answered_call(self, event_data):
+    def get_event_details_as_string(self, event_data):
+        """
+        Convert event data to a formatted string suitable for logging or file writing.
+        Args:
+            event_data (dict): The data to convert.
+        Returns:
+            str: A formatted string.
+        """
+        table = Table(show_header=True, header_style="bold magenta")
+
+        # Dynamically add columns based on the keys in the event data
+        for key in event_data.keys():
+            table.add_column(key.capitalize())
+
+            # Add a row using the values from the event data
+        table.add_row(*[str(value) for value in event_data.values()])
+
+        # Convert the table to a text object
+        text = Text.from_markup(str(table))
+        return str(text)
+
+    def handle_call_answered_event(self, event_data):
         """
         Handle actions upon receiving an answered call event.
         Args:
@@ -549,6 +599,17 @@ class CallMonitor:
 
             # Send the adaptive card to Webex room
             self.send_info_to_webex_room(card_payload)
+
+            event_details = self.extract_event_details(event_data)
+            self.call_history.append(event_details)
+            if self.call_history:
+                self.print_event_details(self.call_history)
+            else:
+                logger_manager.logger.error("Call history is empty")
+
+            # Logging to call_history.log
+            call_history_logger_manager.logger.info(f"Call Answered: {event_data}")
+
         except Exception as e:
             logger_manager.logger.info(f"Error handling answered call event: {e}")
 
@@ -560,10 +621,8 @@ class CallMonitor:
         """
         try:
             logger_manager.logger.debug("Handling call released event")
-
             flattened_data = logger_manager.flatten_json(event_data)
-
-            logger_manager.log_flattened_event_data(flattened_data)  # Log event data in a table format
+            # logger_manager.log_flattened_event_data(flattened_data)  # Log event data in a table format
 
             # Check if the originator is 'originator'; if not, return early
             personality = flattened_data.get('xsi:Event.xsi:eventData.xsi:call.xsi:personality', '').lower()
@@ -575,6 +634,14 @@ class CallMonitor:
 
             # Send the adaptive card to Webex room
             self.send_info_to_webex_room(card_payload)
+
+            event_details = self.extract_event_details(event_data)
+            self.call_history.append(event_details)
+            self.print_event_details(self.call_history)
+
+            # Logging to call_history.log
+            call_history_logger_manager.logger.info(f"Call Answered: {event_data}")
+
         except Exception as e:
             logger_manager.logger.error(f"Error handling call released event: {e}")
 
@@ -606,7 +673,7 @@ class CallMonitor:
             for call in active_calls:
                 try:
                     call.hangup()
-                    logger_manager.logger.info(f"Ended call with Call ID: {call.id}")
+                    # logger_manager.console.print(f"Ended call with Call ID: {call.id}")
                 except Exception as e:
                     logger_manager.logger.error(f"Failed to end the call with Call ID: {call.id}. Error: {e}")
         else:
@@ -647,7 +714,8 @@ class CallMonitor:
         # Check if response has a JSON body, to prevent potential errors when calling response.json()
 
         if response.status_code in [200, 201, 202]:
-            logger_manager.logger.info("Message successfully sent to Webex room.")
+            pass
+            # logger_manager.console.print("Message successfully sent to Webex room.")
         else:
             logger_manager.logger.error(f"Error sending message to Webex room. Status Code: {response.status_code}. Response: {response.text}")
 
