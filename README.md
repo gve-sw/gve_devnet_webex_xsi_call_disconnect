@@ -63,6 +63,11 @@ To run the program, use the command:
 docker-compose up --build
 ```
 
+After exiting program:
+```shell
+docker-compose down
+```
+
 
 ### Additional Info
 * Webex Interaction: This application specifically tracks 'answered' and 'released' call events, and displays them using an adaptive card format for better clarity and user interaction. Doe more info: https://developer.webex.com/buttons-and-cards-designer
@@ -70,7 +75,14 @@ docker-compose up --build
 * A flask dashboard showing Call statistics is displayed at PUBLIC_URL/success
 
 # Screenshots
+**High-level design:**
 
+**Console Output:**
+![/IMAGES/cm_console1.png](/IMAGES/cm_console1.png) <br>
+![/IMAGES/cm_console2.png](/IMAGES/cm_console2.png) <br>
+![/IMAGES/cm_console3.png](/IMAGES/cm_console3.png) <br>
+![/IMAGES/cm_console4.png](/IMAGES/cm_console4.png) <br>
+![/IMAGES/cm_console5.png](/IMAGES/cm_console5.png) <br><br>
 ![/IMAGES/0image.png](/IMAGES/0image.png)
 
 ### LICENSE

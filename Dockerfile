@@ -20,8 +20,5 @@ RUN pip install --upgrade pip && \
 # Make port 5000 available to the world outside this container
 EXPOSE 9001
 
-# Define environment variable
-ENV NAME WebexCallMonitor
-
 # Run app.py when the container launches
 CMD ["python", "app.py"]

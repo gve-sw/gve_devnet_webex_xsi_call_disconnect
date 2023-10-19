@@ -129,5 +129,5 @@ def run():
 
 
 if __name__ == '__main__':
-    logger_manager.console.print(Panel.fit("[bold deep_sky_blue3]Please login to your Webex account... (PUBLIC_URL in .env)[/bold deep_sky_blue3]"))
+    logger_manager.console.print(Panel.fit("[bold deep_sky_blue3]Please login to your Webex account... (PUBLIC_URL)[/bold deep_sky_blue3]"))
     run()

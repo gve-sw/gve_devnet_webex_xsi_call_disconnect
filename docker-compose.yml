@@ -10,6 +10,15 @@ services:
       - "9001:9001"
     environment:
       - NAME=WebexCallMonitor
+      - CLIENT_ID=
+      - CLIENT_SECRET=
+      - APP_SECRET_KEY=123456789
+      - WEBEX_ROOM_ID=
+      - SCOPE=spark:all,spark-admin:xsi,spark:xsi,spark-admin:locations_read,spark-admin:people_read,spark-admin:licenses_read
+      - PUBLIC_URL=
+      - AUTHORIZATION_BASE_URL=https://api.ciscospark.com/v1/authorize
+      - TOKEN_URL=https://api.ciscospark.com/v1/access_token
+      - TIMESPAN_IN_SECONDS=600
     volumes:
       - .:/app  # mounting the entire project directory
     networks:
